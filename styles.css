@@ -1,0 +1,192 @@
+/* Custom styles for Confidence Journey Dashboard */
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Card hover effects */
+.bg-white {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bg-white:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Chart animations */
+canvas {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Calendar heatmap cells */
+#calendarHeatmap .bg-indigo-100 { background-color: #e0e7ff; }
+#calendarHeatmap .bg-indigo-200 { background-color: #c7d2fe; }
+#calendarHeatmap .bg-indigo-300 { background-color: #a5b4fc; }
+#calendarHeatmap .bg-indigo-400 { background-color: #818cf8; }
+#calendarHeatmap .bg-indigo-500 { background-color: #6366f1; }
+#calendarHeatmap .bg-indigo-600 { background-color: #4f46e5; }
+
+/* Insight cards */
+#topMoments > div,
+#growthAreas > div {
+    animation: slideIn 0.3s ease-out;
+    animation-fill-mode: both;
+}
+
+#topMoments > div:nth-child(1) { animation-delay: 0.1s; }
+#topMoments > div:nth-child(2) { animation-delay: 0.2s; }
+#topMoments > div:nth-child(3) { animation-delay: 0.3s; }
+#topMoments > div:nth-child(4) { animation-delay: 0.4s; }
+#topMoments > div:nth-child(5) { animation-delay: 0.5s; }
+
+#growthAreas > div:nth-child(1) { animation-delay: 0.1s; }
+#growthAreas > div:nth-child(2) { animation-delay: 0.2s; }
+#growthAreas > div:nth-child(3) { animation-delay: 0.3s; }
+#growthAreas > div:nth-child(4) { animation-delay: 0.4s; }
+#growthAreas > div:nth-child(5) { animation-delay: 0.5s; }
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Entry list hover effects */
+#entriesList > div {
+    transition: all 0.2s ease;
+}
+
+#entriesList > div:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Filter section */
+select, input[type="range"], input[type="text"] {
+    transition: all 0.2s ease;
+}
+
+select:focus, input[type="text"]:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Power level colors */
+.power-high { color: #10b981; }
+.power-medium { color: #f59e0b; }
+.power-low { color: #ef4444; }
+
+/* Loading state */
+.loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Export button pulse */
+#exportBtn {
+    position: relative;
+    overflow: hidden;
+}
+
+#exportBtn::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+#exportBtn:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* Tooltip styles */
+.group:hover .group-hover\:opacity-100 {
+    z-index: 50;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 640px) {
+    .grid-cols-7 {
+        gap: 0.125rem;
+    }
+    
+    #calendarHeatmap div {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+}
+
+/* Print styles */
+@media print {
+    header, #exportBtn, select, input {
+        display: none;
+    }
+    
+    .bg-white {
+        box-shadow: none !important;
+        page-break-inside: avoid;
+    }
+    
+    body {
+        background: white;
+    }
+}
