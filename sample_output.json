@@ -1,0 +1,49 @@
+{
+  "2024-06-07": {
+    "entries": [
+      {
+        "text": "Feel powerful when looking in the mirror",
+        "category": "self_image",
+        "confidence_type": "personal",
+        "power_level": 8,
+        "transcription_confidence": 9
+      },
+      {
+        "text": "Confidently & Playfully presents cursor to Roma",
+        "category": "professional_presentation", 
+        "confidence_type": "professional",
+        "power_level": 9,
+        "transcription_confidence": 8
+      },
+      {
+        "text": "Feel easy doing frontend today",
+        "category": "technical_skills",
+        "confidence_type": "professional", 
+        "power_level": 7,
+        "transcription_confidence": 9
+      }
+    ],
+    "daily_confidence_average": 8.0,
+    "dominant_confidence_area": "professional"
+  },
+  "2024-06-08": {
+    "entries": [
+      {
+        "text": "Successfully presented the new feature to the team",
+        "category": "professional_presentation",
+        "confidence_type": "professional",
+        "power_level": 9,
+        "transcription_confidence": 8
+      },
+      {
+        "text": "Feeling more confident about my coding abilities",
+        "category": "technical_skills",
+        "confidence_type": "professional",
+        "power_level": 8,
+        "transcription_confidence": 9
+      }
+    ],
+    "daily_confidence_average": 8.5,
+    "dominant_confidence_area": "professional"
+  }
+}

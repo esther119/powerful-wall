@@ -7,571 +7,304 @@ from PIL import Image
 import time
 from tqdm import tqdm
 from datetime import datetime
+import re
+from typing import Dict, List, Optional, Tuple
 from config import Config
 
 
 class PhotoTranscriber:
+    """Elegant photo transcription system for confidence tracking."""
+    
     def __init__(self):
         """Initialize the transcriber with Gemini API."""
         if not Config.GEMINI_API_KEY:
-            raise ValueError(
-                "GEMINI_API_KEY not found. Please set it in your .env file"
-            )
+            raise ValueError("GEMINI_API_KEY not found. Please set it in your .env file")
 
         genai.configure(api_key=Config.GEMINI_API_KEY)
         self.model = genai.GenerativeModel(Config.GEMINI_MODEL)
-
+        
         # Create output directory
         self.output_dir = Path(Config.OUTPUT_DIR)
         self.output_dir.mkdir(exist_ok=True)
-
+        
         self.results = []
 
-    def is_valid_image(self, file_path):
+    def is_valid_image(self, file_path: Path) -> bool:
         """Check if file is a valid image."""
-        path = Path(file_path)
-
-        # Check file extension
-        if path.suffix.lower() not in Config.SUPPORTED_FORMATS:
-            return False
-
-        # Check file size
-        if path.stat().st_size > Config.MAX_IMAGE_SIZE:
-            print(
-                f"Warning: {path.name} is too large ({path.stat().st_size / 1024 / 1024:.1f}MB)"
-            )
-            return False
-
-        # Try to open with PIL
         try:
+            # Check file extension and size
+            if file_path.suffix.lower() not in Config.SUPPORTED_FORMATS:
+                return False
+            
+            if file_path.stat().st_size > Config.MAX_IMAGE_SIZE:
+                print(f"Warning: {file_path.name} is too large ({file_path.stat().st_size / 1024 / 1024:.1f}MB)")
+                return False
+            
+            # Verify image can be opened
             with Image.open(file_path) as img:
                 img.verify()
             return True
         except Exception:
             return False
 
-    def get_image_metadata(self, file_path):
-        """Extract metadata from image."""
-        path = Path(file_path)
-        stat = path.stat()
-
-        metadata = {
-            "filename": path.name,
-            "filepath": str(path),
-            "file_size": stat.st_size,
-            "modified_date": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            "created_date": datetime.fromtimestamp(stat.st_ctime).isoformat(),
-        }
-
-        # Try to get image dimensions
-        try:
-            with Image.open(file_path) as img:
-                metadata["width"] = img.width
-                metadata["height"] = img.height
-                metadata["format"] = img.format
-        except Exception:
-            pass
-
-        return metadata
-
-    def transcribe_image(self, image_path):
+    def transcribe_image(self, image_path: Path) -> Dict:
         """Transcribe text from a single image using Gemini."""
         try:
-            # Load and prepare image
             image = Image.open(image_path)
-
-            # Generate transcription
             response = self.model.generate_content([Config.TRANSCRIPTION_PROMPT, image])
-
-            # Get metadata
-            metadata = self.get_image_metadata(image_path)
-
-            # Parse response
+            
             transcription_text = response.text if response.text else ""
-
-            result = {
+            parsed_data = self._parse_json_response(transcription_text)
+            
+            return {
                 "timestamp": datetime.now().isoformat(),
-                "metadata": metadata,
-                "raw_response": transcription_text,
-                "parsed_data": self.parse_transcription(transcription_text),
+                "filename": image_path.name,
+                "parsed_data": parsed_data,
                 "success": True,
                 "error": None,
             }
-
-            return result
-
+            
         except Exception as e:
             return {
                 "timestamp": datetime.now().isoformat(),
-                "metadata": self.get_image_metadata(image_path),
-                "raw_response": "",
+                "filename": image_path.name,
                 "parsed_data": {},
                 "success": False,
                 "error": str(e),
             }
 
-    def parse_transcription(self, text):
-        """Parse the structured transcription response and organize by date."""
-        import re
-        from datetime import datetime
-
-        date_entries = {}
-
-        # Try JSON format first (what AI actually returns)
-        if text.strip().startswith("```json") or (
-            '"DATE"' in text and '"ENTRY"' in text
-        ):
-            try:
-                # Extract JSON from markdown code block if present
-                if text.strip().startswith("```json"):
-                    json_text = text.split("```json")[1].split("```")[0].strip()
-                else:
-                    json_text = text
-
-                import json
-
-                entries_list = json.loads(json_text)
-
-                for entry_data in entries_list:
-                    date_str = entry_data.get("DATE", "")
-                    text_content = entry_data.get("ENTRY", "")
-                    category = entry_data.get("CATEGORY", "unknown")
-                    confidence_type = entry_data.get("TYPE", "personal")
-
-                    if date_str and text_content:
-                        iso_date = self._convert_to_iso_date(date_str)
-                        entry = {
-                            "date": iso_date,
-                            "text": text_content,
-                            "category": category,
-                            "confidence_type": confidence_type,
-                        }
-                        self._add_entry_to_date(date_entries, entry)
-
-            except (json.JSONDecodeError, KeyError, IndexError) as e:
-# JSON parsing failed, trying fallback methods
-                # Fall through to other parsing methods
-
-        # Try the structured format
-        elif "**DATE:**" in text and "**ENTRY:**" in text:
-            # New structured format
-            current_entry = {}
-            lines = text.split("\n")
-
-            for line in lines:
-                line = line.strip()
-                if not line:
+    def _parse_json_response(self, text: str) -> Dict:
+        """Parse JSON response from Gemini API."""
+        try:
+            # Extract JSON from markdown code blocks if present
+            if "```json" in text:
+                json_match = re.search(r'```json\s*(\[.*?\])\s*```', text, re.DOTALL)
+                if json_match:
+                    text = json_match.group(1)
+            
+            # Parse the JSON entries
+            entries = json.loads(text)
+            if not isinstance(entries, list):
+                return {}
+            
+            # Group entries by date and calculate metrics
+            date_groups = {}
+            for entry in entries:
+                if not self._is_valid_entry(entry):
                     continue
+                
+                date = self._normalize_date(entry["date"])
+                if date not in date_groups:
+                    date_groups[date] = {"entries": []}
+                
+                # Add entry with all required fields
+                formatted_entry = {
+                    "text": entry["text"],
+                    "category": entry["category"],
+                    "confidence_type": entry["confidence_type"],
+                    "power_level": int(entry["power_level"]),
+                    "transcription_confidence": int(entry["transcription_confidence"])
+                }
+                date_groups[date]["entries"].append(formatted_entry)
+            
+            # Calculate daily metrics
+            for date, data in date_groups.items():
+                entries = data["entries"]
+                power_levels = [entry["power_level"] for entry in entries]
+                confidence_types = [entry["confidence_type"] for entry in entries]
+                
+                # Calculate daily average
+                data["daily_confidence_average"] = round(sum(power_levels) / len(power_levels), 1)
+                
+                # Determine dominant confidence area
+                data["dominant_confidence_area"] = self._get_dominant_type(confidence_types)
+            
+            return date_groups
+            
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            print(f"Failed to parse JSON response: {e}")
+            return {}
 
-                if line.startswith("**DATE:**"):
-                    # Save previous entry if exists
-                    if current_entry and "date" in current_entry:
-                        self._add_entry_to_date(date_entries, current_entry)
+    def _is_valid_entry(self, entry: Dict) -> bool:
+        """Check if entry has all required fields."""
+        required_fields = ["date", "text", "category", "confidence_type", "power_level", "transcription_confidence"]
+        return all(field in entry and entry[field] for field in required_fields)
 
-                    # Start new entry
-                    date_str = line.replace("**DATE:**", "").strip()
-                    iso_date = self._convert_to_iso_date(date_str)
-                    current_entry = {"date": iso_date}
-
-                elif line.startswith("**ENTRY:**"):
-                    current_entry["text"] = line.replace("**ENTRY:**", "").strip()
-
-                elif line.startswith("**CATEGORY:**"):
-                    current_entry["category"] = line.replace(
-                        "**CATEGORY:**", ""
-                    ).strip()
-
-                elif line.startswith("**TYPE:**"):
-                    current_entry["confidence_type"] = line.replace(
-                        "**TYPE:**", ""
-                    ).strip()
-
-            # Don't forget the last entry
-            if current_entry and "date" in current_entry:
-                self._add_entry_to_date(date_entries, current_entry)
-
-        else:
-            # Fallback to old format parsing with auto-categorization
-# Using fallback parsing for old format
-            sections = re.split(r"\*\*TEXT \d+:\*\*", text)
-
-            for section in sections[1:]:  # Skip the first empty section
-                lines = section.strip().split("\n")
-                if not lines:
-                    continue
-
-                date_line = lines[0].strip()
-
-                # Extract date from first line
-                date_match = re.search(
-                    r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d+(?:st|nd|rd|th)?)",
-                    date_line,
-                )
-                if date_match:
-                    current_date = self._convert_to_iso_date(date_match.group(1))
-
-                    # Extract text entries
-                    texts = []
-                    for line in lines[1:]:
-                        line = line.strip()
-                        if (
-                            line.startswith("①")
-                            or line.startswith("②")
-                            or line.startswith("③")
-                            or line.startswith("④")
-                        ):
-                            clean_text = re.sub(r"^[①②③④]\s*", "", line).strip()
-                            if clean_text:
-                                texts.append(clean_text)
-                        elif (
-                            line
-                            and not line.startswith("**")
-                            and not line.startswith("CONTEXT:")
-                            and not line.startswith("CONFIDENCE:")
-                        ):
-                            if line and not line.startswith("A collection"):
-                                texts.append(line)
-
-                    # Auto-categorize and create entries
-                    if current_date and texts:
-                        for text in texts:
-                            entry = {
-                                "text": text,
-                                "category": self._auto_categorize(text),
-                                "confidence_type": self._determine_confidence_type(
-                                    text
-                                ),
-                            }
-                            self._add_entry_to_date(
-                                date_entries, {"date": current_date, **entry}
-                            )
-
-        # Calculate daily summaries
-        for date, data in date_entries.items():
-            if "entries" in data:
-                categories = [
-                    entry.get("category", "unknown") for entry in data["entries"]
-                ]
-                if categories:
-                    dominant_category = max(set(categories), key=categories.count)
-                    data["dominant_confidence_area"] = dominant_category
-
-
-        return date_entries
-
-    def _auto_categorize(self, text):
-        """Auto-categorize text based on keywords."""
-        text_lower = text.lower()
-
-        # Technical skills
-        if any(
-            word in text_lower
-            for word in [
-                "frontend",
-                "backend",
-                "coding",
-                "code",
-                "js",
-                "javascript",
-                "react",
-                "python",
-                "bug",
-                "pipeline",
-                "sentry",
-            ]
-        ):
-            return "technical_skills"
-
-        # Professional presentation
-        if any(
-            word in text_lower
-            for word in [
-                "present",
-                "demo",
-                "cursor",
-                "laugh",
-                "confidently",
-                "playfully",
-            ]
-        ):
-            return "professional_presentation"
-
-        # Self image
-        if any(
-            word in text_lower
-            for word in ["mirror", "powerful", "growth", "mood", "perfect"]
-        ):
-            return "self_image"
-
-        # Social interactions
-        if any(
-            word in text_lower
-            for word in ["talk", "therapist", "ethan", "friends", "annie"]
-        ):
-            return "social_interactions"
-
-        # Creative work
-        if any(
-            word in text_lower
-            for word in ["video", "pomodoro", "ocean", "curiosity", "meditation"]
-        ):
-            return "creative_work"
-
-        # Career development
-        if any(
-            word in text_lower for word in ["recruiter", "email", "interview", "job"]
-        ):
-            return "career_development"
-
-        # Physical wellness
-        if any(
-            word in text_lower for word in ["teeth", "recovery", "dentist", "health"]
-        ):
-            return "physical_wellness"
-
-        # Default to personal growth
-        return "personal_growth"
-
-    def _determine_confidence_type(self, text):
-        """Determine if this is personal or professional confidence."""
-        text_lower = text.lower()
-
-        # Professional indicators
-        if any(
-            word in text_lower
-            for word in [
-                "work",
-                "frontend",
-                "backend",
-                "demo",
-                "cursor",
-                "interview",
-                "recruiter",
-                "pipeline",
-            ]
-        ):
-            return "professional"
-
-        # Personal indicators
-        if any(
-            word in text_lower
-            for word in [
-                "mirror",
-                "feel",
-                "growth",
-                "meditation",
-                "personal",
-                "therapist",
-            ]
-        ):
-            return "personal"
-
-        # Default to personal
-        return "personal"
-
-    def _add_entry_to_date(self, date_entries, entry):
-        """Helper method to add an entry to the appropriate date."""
-        date = entry["date"]
-        if date not in date_entries:
-            date_entries[date] = {"entries": []}
-
-        # Only add if we have the required fields
-        if all(key in entry for key in ["text", "category", "confidence_type"]):
-            entry_data = {
-                "text": entry["text"],
-                "category": entry["category"],
-                "confidence_type": entry["confidence_type"],
-            }
-            date_entries[date]["entries"].append(entry_data)
-
-    def _convert_to_iso_date(self, date_str):
-        """Convert various date formats to ISO format (YYYY-MM-DD)."""
-        import re
-        from datetime import datetime
-
-        # Handle formats like "June 7th", "May 14th", "Apr 22nd"
+    def _normalize_date(self, date_str: str) -> str:
+        """Convert date string to ISO format (YYYY-MM-DD)."""
         month_map = {
-            "Jan": "01",
-            "Feb": "02",
-            "Mar": "03",
-            "Apr": "04",
-            "May": "05",
-            "Jun": "06",
-            "Jul": "07",
-            "Aug": "08",
-            "Sep": "09",
-            "Oct": "10",
-            "Nov": "11",
-            "Dec": "12",
+            "january": "01", "february": "02", "march": "03", "april": "04",
+            "may": "05", "june": "06", "july": "07", "august": "08",
+            "september": "09", "october": "10", "november": "11", "december": "12",
+            "jan": "01", "feb": "02", "mar": "03", "apr": "04", "may": "05",
+            "jun": "06", "jul": "07", "aug": "08", "sep": "09", "oct": "10",
+            "nov": "11", "dec": "12"
         }
-
-        # Extract month and day
-        match = re.search(
-            r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* (\d+)", date_str
-        )
+        
+        # Extract month and day from various formats
+        match = re.search(r'(\w+)\s+(\d+)', date_str.lower())
         if match:
-            month_abbr = match.group(1)
-            day = match.group(2).zfill(2)  # Zero pad day
-            month = month_map.get(month_abbr, "01")
-
-            # Default to current year (you can modify this logic)
+            month_str, day_str = match.groups()
+            month = month_map.get(month_str, "01")
+            day = day_str.zfill(2)
             current_year = datetime.now().year
             return f"{current_year}-{month}-{day}"
-
-        # Fallback: return original if can't parse
+        
         return date_str
 
-    def transcribe_batch(self, image_paths):
-        """Transcribe a batch of images."""
-        results = []
+    def _get_dominant_type(self, confidence_types: List[str]) -> str:
+        """Get the most common confidence type."""
+        if not confidence_types:
+            return "personal"
+        
+        type_counts = {}
+        for conf_type in confidence_types:
+            type_counts[conf_type] = type_counts.get(conf_type, 0) + 1
+        
+        return max(type_counts, key=lambda x: type_counts[x])
 
-        for image_path in tqdm(image_paths, desc="Transcribing images"):
-            if not self.is_valid_image(image_path):
-                print(f"Skipping invalid image: {image_path}")
-                continue
-
-            result = self.transcribe_image(image_path)
-            results.append(result)
-
-            # Small delay to respect API limits
-            time.sleep(0.5)
-
-        return results
-
-    def transcribe_folder(self, folder_path):
+    def transcribe_folder(self, folder_path: str) -> List[Dict]:
         """Transcribe all images in a folder."""
         folder = Path(folder_path)
-
+        
         if not folder.exists():
             raise ValueError(f"Folder does not exist: {folder_path}")
-
+        
         # Find all image files
         image_files = []
         for ext in Config.SUPPORTED_FORMATS:
             image_files.extend(folder.glob(f"*{ext}"))
             image_files.extend(folder.glob(f"*{ext.upper()}"))
-
+        
         print(f"Found {len(image_files)} images to transcribe")
-
-        # Process in batches
+        
+        # Process images with progress bar
         all_results = []
-        for i in range(0, len(image_files), Config.BATCH_SIZE):
-            batch = image_files[i : i + Config.BATCH_SIZE]
-            batch_results = self.transcribe_batch(batch)
-            all_results.extend(batch_results)
-
-            # Save intermediate results
-            self.save_results(all_results, suffix=f"_batch_{i//Config.BATCH_SIZE + 1}")
-
+        for image_path in tqdm(image_files, desc="Transcribing images"):
+            if not self.is_valid_image(image_path):
+                print(f"Skipping invalid image: {image_path}")
+                continue
+            
+            result = self.transcribe_image(image_path)
+            all_results.append(result)
+            
+            # Respect API limits
+            time.sleep(0.5)
+        
         self.results = all_results
         return all_results
 
-    def save_results(self, results=None, suffix=""):
-        """Save transcription results to file."""
+    def save_results(self, results: Optional[List[Dict]] = None, suffix: str = "") -> Path:
+        """Save transcription results in the target format."""
         if results is None:
             results = self.results
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-        # Create simplified format for output
-        simplified_results = {}
-
+        
+        # Merge all parsed data into single output format
+        consolidated_data = {}
+        
         for result in results:
             if result["success"] and result["parsed_data"]:
-                parsed_data = result["parsed_data"]
-
-                # Handle the new structured format
-                for date, data in parsed_data.items():
-                    if date in simplified_results:
-                        # Merge entries if date already exists
-                        if "entries" in data:
-                            simplified_results[date]["entries"].extend(data["entries"])
-                    else:
-                        simplified_results[date] = data
-
-        # Save the simplified format
-        if Config.OUTPUT_FORMAT == "json":
-            filename = f"transcriptions_{timestamp}{suffix}.json"
-            filepath = self.output_dir / filename
-
-            with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(simplified_results, f, indent=2, ensure_ascii=False)
-
-        elif Config.OUTPUT_FORMAT == "csv":
-            filename = f"transcriptions_{timestamp}{suffix}.csv"
-            filepath = self.output_dir / filename
-
-            # Flatten the new structured results for CSV
-            flat_results = []
-            for date, data in simplified_results.items():
-                if "entries" in data:
-                    for entry in data["entries"]:
-                        flat_results.append(
-                            {
-                                "date": date,
-                                "text": entry["text"],
-                                "category": entry["category"],
-                                "confidence_type": entry["confidence_type"],
-                                "dominant_area": data.get(
-                                    "dominant_confidence_area", "unknown"
-                                ),
-                            }
+                for date, data in result["parsed_data"].items():
+                    if date in consolidated_data:
+                        # Merge entries for the same date
+                        consolidated_data[date]["entries"].extend(data["entries"])
+                        
+                        # Recalculate daily average
+                        all_power_levels = [entry["power_level"] for entry in consolidated_data[date]["entries"]]
+                        consolidated_data[date]["daily_confidence_average"] = round(
+                            sum(all_power_levels) / len(all_power_levels), 1
                         )
-
-            df = pd.DataFrame(flat_results)
-            df.to_csv(filepath, index=False)
-
+                        
+                        # Recalculate dominant area
+                        all_confidence_types = [entry["confidence_type"] for entry in consolidated_data[date]["entries"]]
+                        consolidated_data[date]["dominant_confidence_area"] = self._get_dominant_type(all_confidence_types)
+                    else:
+                        consolidated_data[date] = data
+        
+        # Save to file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"transcriptions_{timestamp}{suffix}.json"
+        filepath = self.output_dir / filename
+        
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(consolidated_data, f, indent=2, ensure_ascii=False)
+        
         print(f"Results saved to: {filepath}")
         return filepath
+
+    def get_summary(self) -> Dict:
+        """Get a summary of transcription results."""
+        if not self.results:
+            return {"total": 0, "successful": 0, "failed": 0, "entries": 0}
+        
+        successful = sum(1 for r in self.results if r["success"])
+        failed = len(self.results) - successful
+        
+        total_entries = 0
+        for result in self.results:
+            if result["success"]:
+                for date_data in result["parsed_data"].values():
+                    total_entries += len(date_data.get("entries", []))
+        
+        return {
+            "total": len(self.results),
+            "successful": successful,
+            "failed": failed,
+            "entries": total_entries
+        }
 
 
 def main():
     """Main function to run transcription."""
     transcriber = PhotoTranscriber()
-
-    # Use fixed input folder path
+    
     folder_path = "input_photos"
     print(f"Using input folder: {folder_path}")
-
+    
     try:
         results = transcriber.transcribe_folder(folder_path)
         output_file = transcriber.save_results(results)
-
-        print(f"\nTranscription complete!")
-        print(f"Processed {len(results)} images")
-        print(f"Results saved to: {output_file}")
-
+        
         # Show summary
-        successful = sum(1 for r in results if r["success"])
-        failed = len(results) - successful
-
-        print(f"\nSummary:")
-        print(f"✅ Successfully transcribed: {successful}")
-        print(f"❌ Failed: {failed}")
-
-        if successful > 0:
-            print(f"\nSample transcription:")
+        summary = transcriber.get_summary()
+        print(f"\n🎉 Transcription complete!")
+        print(f"📊 Summary:")
+        print(f"   • Total images: {summary['total']}")
+        print(f"   • ✅ Successful: {summary['successful']}")
+        print(f"   • ❌ Failed: {summary['failed']}")
+        print(f"   • 📝 Total entries: {summary['entries']}")
+        print(f"   • 💾 Output: {output_file}")
+        
+        # Show sample if available
+        if summary['successful'] > 0:
+            print(f"\n📋 Sample output format:")
+            sample_data = {}
             for result in results:
                 if result["success"] and result["parsed_data"]:
-                    print(f"File: {result['metadata']['filename']}")
-                    # Show first few dates and texts
-                    parsed_data = result["parsed_data"]
-                    if isinstance(parsed_data, dict):
-                        for date, data in list(parsed_data.items())[
-                            :2
-                        ]:  # Show first 2 dates
-                            print(f"Date: {date}")
-                            if "entries" in data:
-                                for i, entry in enumerate(
-                                    data["entries"][:2]
-                                ):  # Show first 2 entries per date
-                                    print(f"  Entry {i+1}: {entry['text'][:100]}...")
-                                    print(f"    Category: {entry['category']}")
-                                    print(f"    Type: {entry['confidence_type']}")
+                    sample_data = result["parsed_data"]
                     break
-
+            
+            if sample_data:
+                sample_date = list(sample_data.keys())[0]
+                sample_entry = sample_data[sample_date]
+                print(f"  \"{sample_date}\": {{")
+                print(f"    \"entries\": [")
+                if sample_entry["entries"]:
+                    entry = sample_entry["entries"][0]
+                    print(f"      {{")
+                    print(f"        \"text\": \"{entry['text'][:50]}...\",")
+                    print(f"        \"category\": \"{entry['category']}\",")
+                    print(f"        \"confidence_type\": \"{entry['confidence_type']}\",")
+                    print(f"        \"power_level\": {entry['power_level']},")
+                    print(f"        \"transcription_confidence\": {entry['transcription_confidence']}")
+                    print(f"      }}")
+                print(f"    ],")
+                print(f"    \"daily_confidence_average\": {sample_entry['daily_confidence_average']},")
+                print(f"    \"dominant_confidence_area\": \"{sample_entry['dominant_confidence_area']}\"")
+                print(f"  }}")
+        
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Error: {e}")
 
 
 if __name__ == "__main__":

@@ -23,10 +23,10 @@ class Config:
     TRANSCRIPTION_PROMPT = """
     Analyze this image and extract all handwritten text content about feelings, emotions, and personal reflections.
     
-    For each date found, provide:
-    1. The date in a clear format
-    2. Each separate text entry 
-    3. Categorize each entry into one of these categories:
+    For each text entry found, provide:
+    1. The date in a clear format (Month Day format like "June 7" or "May 14")
+    2. The text content
+    3. Categorize into one of these categories:
        - technical_skills (coding, development, technical work)
        - professional_presentation (presentations, demos, work interactions)
        - self_image (personal reflections, self-perception)
@@ -36,12 +36,30 @@ class Config:
        - physical_wellness (health, body, recovery)
        - career_development (job search, networking, career moves)
     4. Classify confidence type as either "personal" or "professional"
+    5. Rate the power level from 1-10 (how confident/powerful the person felt)
+    6. Rate your transcription confidence from 1-10 (how confident you are in reading the text)
     
-    Please provide the transcription in this JSON-like format:
-    **DATE:** [Date in Month Day format]
-    **ENTRY:** [Text content]
-    **CATEGORY:** [One of the categories above]
-    **TYPE:** [personal or professional]
+    Return ONLY valid JSON in this exact format:
+    ```json
+    [
+      {
+        "date": "June 7",
+        "text": "Feel powerful when looking in the mirror",
+        "category": "self_image",
+        "confidence_type": "personal",
+        "power_level": 8,
+        "transcription_confidence": 9
+      },
+      {
+        "date": "June 7", 
+        "text": "Confidently & Playfully presents cursor to Roma",
+        "category": "professional_presentation",
+        "confidence_type": "professional", 
+        "power_level": 9,
+        "transcription_confidence": 8
+      }
+    ]
+    ```
     
-    Continue for all entries found.
+    Important: Return ONLY the JSON array, no other text or explanations.
     """
