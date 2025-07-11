@@ -21,15 +21,27 @@ class Config:
 
     # Transcription Settings
     TRANSCRIPTION_PROMPT = """
-    Analyze this image and extract all text content. Focus on:
-    1. Any handwritten or typed text about feelings, emotions, or personal reflections
-    2. Preserve the original tone and meaning
-    3. If there are multiple text elements, separate them clearly
-    4. All the text are handwritten
-    5. Include any context about the setting if relevant to the text
+    Analyze this image and extract all handwritten text content about feelings, emotions, and personal reflections.
     
-    Please provide the transcription in this format:
-    TEXT: [extracted text]
-    CONTEXT: [brief description of setting/context if relevant]
-    CONFIDENCE: [high/medium/low based on text clarity]
+    For each date found, provide:
+    1. The date in a clear format
+    2. Each separate text entry 
+    3. Categorize each entry into one of these categories:
+       - technical_skills (coding, development, technical work)
+       - professional_presentation (presentations, demos, work interactions)
+       - self_image (personal reflections, self-perception)
+       - social_interactions (conversations, relationships, social activities)
+       - creative_work (videos, projects, artistic endeavors)
+       - personal_growth (learning, development, insights)
+       - physical_wellness (health, body, recovery)
+       - career_development (job search, networking, career moves)
+    4. Classify confidence type as either "personal" or "professional"
+    
+    Please provide the transcription in this JSON-like format:
+    **DATE:** [Date in Month Day format]
+    **ENTRY:** [Text content]
+    **CATEGORY:** [One of the categories above]
+    **TYPE:** [personal or professional]
+    
+    Continue for all entries found.
     """
