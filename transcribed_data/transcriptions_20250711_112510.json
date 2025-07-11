@@ -1,0 +1,62 @@
+{
+  "2025-06-04": {
+    "entries": [
+      {
+        "text": "Feel my teeth's recovery",
+        "category": "physical_wellness",
+        "confidence_type": "personal",
+        "power_level": 7,
+        "transcription_confidence": 9
+      }
+    ],
+    "daily_confidence_average": 7.0,
+    "dominant_confidence_area": "personal"
+  },
+  "2025-06-05": {
+    "entries": [
+      {
+        "text": "Confidently & Playfully presents cursor to Roma",
+        "category": "professional_presentation",
+        "confidence_type": "professional",
+        "power_level": 9,
+        "transcription_confidence": 10
+      },
+      {
+        "text": "Make Cursor people laugh",
+        "category": "professional_presentation",
+        "confidence_type": "professional",
+        "power_level": 8,
+        "transcription_confidence": 10
+      },
+      {
+        "text": "Realize my growth/mood change throughout the interview: I need to be perfect/great process of growth. What's mine is mine.",
+        "category": "self_image",
+        "confidence_type": "personal",
+        "power_level": 6,
+        "transcription_confidence": 9
+      }
+    ],
+    "daily_confidence_average": 7.7,
+    "dominant_confidence_area": "professional"
+  },
+  "2025-04-22": {
+    "entries": [
+      {
+        "text": "Feel powerful when looking in the mirror",
+        "category": "self_image",
+        "confidence_type": "personal",
+        "power_level": 8,
+        "transcription_confidence": 10
+      },
+      {
+        "text": "Feel connected when Ethan probes me on the engineering ideas (Analyze interview process)",
+        "category": "self_image",
+        "confidence_type": "personal",
+        "power_level": 7,
+        "transcription_confidence": 9
+      }
+    ],
+    "daily_confidence_average": 7.5,
+    "dominant_confidence_area": "personal"
+  }
+}
