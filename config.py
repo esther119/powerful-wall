@@ -37,7 +37,6 @@ class Config:
        - career_development (job search, networking, career moves)
     4. Classify confidence type as either "personal" or "professional"
     5. Rate the power level from 1-10 (how confident/powerful the person felt)
-    6. Rate your transcription confidence from 1-10 (how confident you are in reading the text)
     
     Return ONLY valid JSON in this exact format:
     ```json
@@ -47,16 +46,14 @@ class Config:
         "text": "Feel powerful when looking in the mirror",
         "category": "self_image",
         "confidence_type": "personal",
-        "power_level": 8,
-        "transcription_confidence": 9
+        "power_level": 8
       },
       {
         "date": "June 7", 
         "text": "Confidently & Playfully presents cursor to Roma",
         "category": "professional_presentation",
         "confidence_type": "professional", 
-        "power_level": 9,
-        "transcription_confidence": 8
+        "power_level": 9
       }
     ]
     ```

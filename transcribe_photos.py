@@ -102,8 +102,7 @@ class PhotoTranscriber:
                     "text": entry["text"],
                     "category": entry["category"],
                     "confidence_type": entry["confidence_type"],
-                    "power_level": int(entry["power_level"]),
-                    "transcription_confidence": int(entry["transcription_confidence"])
+                    "power_level": int(entry["power_level"])
                 }
                 date_groups[date]["entries"].append(formatted_entry)
             
@@ -127,7 +126,7 @@ class PhotoTranscriber:
 
     def _is_valid_entry(self, entry: Dict) -> bool:
         """Check if entry has all required fields."""
-        required_fields = ["date", "text", "category", "confidence_type", "power_level", "transcription_confidence"]
+        required_fields = ["date", "text", "category", "confidence_type", "power_level"]
         return all(field in entry and entry[field] for field in required_fields)
 
     def _normalize_date(self, date_str: str) -> str:
@@ -295,8 +294,7 @@ def main():
                     print(f"        \"text\": \"{entry['text'][:50]}...\",")
                     print(f"        \"category\": \"{entry['category']}\",")
                     print(f"        \"confidence_type\": \"{entry['confidence_type']}\",")
-                    print(f"        \"power_level\": {entry['power_level']},")
-                    print(f"        \"transcription_confidence\": {entry['transcription_confidence']}")
+                    print(f"        \"power_level\": {entry['power_level']}")
                     print(f"      }}")
                 print(f"    ],")
                 print(f"    \"daily_confidence_average\": {sample_entry['daily_confidence_average']},")
