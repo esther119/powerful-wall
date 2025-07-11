@@ -164,8 +164,8 @@
         "power_level": 8
       },
       {
-        "text": "I got 100 ppl in cursor event",
-        "category": "professional_presentation",
+        "text": "2 out of 100 women in cursor event",
+        "category": "career_development",
         "confidence_type": "professional",
         "power_level": 9
       },
@@ -188,9 +188,9 @@
   "2025-05-03": {
     "entries": [
       {
-        "text": "Handle all Todorma things myself",
-        "category": "career_development",
-        "confidence_type": "professional",
+        "text": "Handle all Tadaima things myself",
+        "category": "self_image",
+        "confidence_type": "personal",
         "power_level": 8
       },
       {
@@ -638,7 +638,7 @@
   "2025-05-01": {
     "entries": [
       {
-        "text": "Great aura talking to Wisp Flow founder",
+        "text": "Great aura talking to Wispr Flow founder",
         "category": "professional_presentation",
         "confidence_type": "professional",
         "power_level": 9
@@ -836,10 +836,10 @@
         "power_level": 8
       },
       {
-        "text": "Do tasks 'as if most powerful'",
-        "category": "personal_growth",
-        "confidence_type": "personal",
-        "power_level": 9
+        "text": "Do all most a pull up",
+        "category": "physical_wellness",
+        "confidence_type": "physical",
+        "power_level": 8
       },
       {
         "text": "Watch my complex emotions dissolve & reframe",
